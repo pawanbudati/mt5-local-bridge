@@ -7,7 +7,7 @@ ENV WINEPREFIX=/root/.wine
 ENV DISPLAY=:99
 ENV WINEDLLOVERRIDES="mscoree,mshtml="
 
-# Install Wine, Xvfb, Wget, Curl & Certificates
+# Install Wine, Xvfb, Wget, Curl, Unzip & Certificates
 RUN dpkg --add-architecture i386 && \
     apt-get update && apt-get install -y --no-install-recommends \
     wine64 \
@@ -15,15 +15,29 @@ RUN dpkg --add-architecture i386 && \
     xvfb \
     wget \
     curl \
+    unzip \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Download Windows Python 3.10 installer for Wine
-RUN wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe -O python-installer.exe && \
-    xvfb-run wine python-installer.exe /quiet InstallAllUsers=1 PrependPath=1 && \
-    rm python-installer.exe
+# Initialize Wine prefix headlessly
+RUN xvfb-run wineboot --init || true
+
+# Download & extract Windows Python 3.10 embedded package inside Wine drive_c
+RUN mkdir -p /root/.wine/drive_c/Python310 && \
+    wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip -O python.zip && \
+    unzip python.zip -d /root/.wine/drive_c/Python310 && \
+    rm python.zip && \
+    sed -i 's/#import site/import site/' /root/.wine/drive_c/Python310/python310._pth
+
+# Install pip for Wine Windows Python
+RUN wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py && \
+    xvfb-run wine /root/.wine/drive_c/Python310/python.exe get-pip.py && \
+    rm get-pip.py
+
+# Install MetaTrader5, Flask & flask-cors inside Wine
+RUN xvfb-run wine /root/.wine/drive_c/Python310/python.exe -m pip install --no-cache-dir MetaTrader5 Flask flask-cors
 
 # Copy bridge application files
 COPY requirements.txt .
@@ -31,10 +45,6 @@ COPY mt5_bridge.py .
 COPY start_linux.sh .
 
 RUN chmod +x start_linux.sh
-
-# Install MetaTrader5, Flask, and flask-cors inside Wine's Windows Python environment
-RUN xvfb-run wine python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    xvfb-run wine python -m pip install --no-cache-dir MetaTrader5 Flask flask-cors
 
 EXPOSE 8555
 
