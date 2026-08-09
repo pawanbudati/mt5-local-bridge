@@ -7,9 +7,10 @@ ENV WINEPREFIX=/root/.wine
 ENV DISPLAY=:99
 ENV WINEDLLOVERRIDES="mscoree,mshtml="
 
-# Install Wine, Xvfb, Wget, Curl, Unzip & Certificates
+# Install Wine HQ / Ubuntu packages + Xvfb + Utilities
 RUN dpkg --add-architecture i386 && \
     apt-get update && apt-get install -y --no-install-recommends \
+    wine \
     wine64 \
     wine32 \
     xvfb \
@@ -21,9 +22,6 @@ RUN dpkg --add-architecture i386 && \
 
 WORKDIR /app
 
-# Initialize Wine prefix headlessly
-RUN xvfb-run wineboot --init || true
-
 # Download & extract Windows Python 3.10 embedded package inside Wine drive_c
 RUN mkdir -p /root/.wine/drive_c/Python310 && \
     wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip -O python.zip && \
@@ -33,11 +31,11 @@ RUN mkdir -p /root/.wine/drive_c/Python310 && \
 
 # Install pip for Wine Windows Python
 RUN wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py && \
-    xvfb-run wine /root/.wine/drive_c/Python310/python.exe get-pip.py && \
+    xvfb-run wine64 /root/.wine/drive_c/Python310/python.exe get-pip.py && \
     rm get-pip.py
 
 # Install MetaTrader5, Flask & flask-cors inside Wine
-RUN xvfb-run wine /root/.wine/drive_c/Python310/python.exe -m pip install --no-cache-dir MetaTrader5 Flask flask-cors
+RUN xvfb-run wine64 /root/.wine/drive_c/Python310/python.exe -m pip install --no-cache-dir MetaTrader5 Flask flask-cors
 
 # Copy bridge application files
 COPY requirements.txt .
