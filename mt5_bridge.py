@@ -27,16 +27,39 @@ app = Flask(__name__)
 if HAS_CORS:
     CORS(app)
 
+def ensure_mt5_connected(account_id=None, password=None, server_name=None):
+    if not MT5_AVAILABLE:
+        return False
+
+    # Check if already connected & logged in
+    if mt5.terminal_info() and mt5.account_info():
+        return True
+
+    # Try default terminal attach
+    if mt5.initialize():
+        if mt5.account_info():
+            return True
+
+    # Try explicit credential login
+    if account_id and password:
+        try:
+            acc_num = int(account_id)
+            srv = server_name or "XMGlobal-Real 30"
+            print(f"🔑 Attempting MT5 login for account {acc_num} on server '{srv}'...")
+            if mt5.login(login=acc_num, password=password, server=srv):
+                print(f"✅ Successfully logged into MT5 Account {acc_num}!")
+                return True
+            else:
+                print(f"⚠️ MT5 login failed: {mt5.last_error()}")
+        except Exception as e:
+            print(f"⚠️ MT5 login error: {e}")
+
+    return mt5.terminal_info() is not None and mt5.account_info() is not None
+
 @app.route('/health', methods=['GET'])
 def health():
-    connected = False
-    acc_info = None
-    if MT5_AVAILABLE:
-        if not mt5.terminal_info():
-            mt5.initialize()
-        connected = mt5.terminal_info() is not None
-        if connected:
-            acc_info = mt5.account_info()
+    connected = ensure_mt5_connected()
+    acc_info = mt5.account_info() if connected else None
 
     return jsonify({
         "status": "online",
@@ -46,13 +69,43 @@ def health():
         "server": acc_info.server if acc_info else None,
     })
 
+@app.route('/connect', methods=['POST'])
+def connect_account():
+    if not MT5_AVAILABLE:
+        return jsonify({"success": False, "error": "MetaTrader5 Python module not installed."}), 500
+
+    data = request.json or {}
+    acc = data.get('account') or data.get('accountId')
+    pwd = data.get('password')
+    srv = data.get('server') or data.get('serverName') or 'XMGlobal-Real 30'
+
+    if not acc or not pwd:
+        return jsonify({"success": False, "error": "Account ID and Password required"}), 400
+
+    connected = ensure_mt5_connected(acc, pwd, srv)
+    if connected and mt5.account_info():
+        info = mt5.account_info()
+        return jsonify({
+            "success": True,
+            "message": f"Connected to MT5 Account {info.login}",
+            "account_id": info.login,
+            "server": info.server
+        })
+    else:
+        err = str(mt5.last_error())
+        return jsonify({"success": False, "error": f"Failed to connect MT5 terminal: {err}"}), 400
+
 @app.route('/account', methods=['GET'])
 def get_account():
     if not MT5_AVAILABLE:
         return jsonify({"success": False, "error": "MetaTrader5 Python module not installed."}), 500
 
-    if not mt5.terminal_info() and not mt5.initialize():
-        return jsonify({"success": False, "error": f"Failed to connect to MT5 terminal: {mt5.last_error()}"}), 500
+    acc_id = request.args.get('account')
+    pwd = request.args.get('password')
+    srv = request.args.get('server')
+
+    if not ensure_mt5_connected(acc_id, pwd, srv):
+        return jsonify({"success": False, "error": f"MT5 terminal not connected: {mt5.last_error()}"}), 500
 
     acc = mt5.account_info()
     if not acc:
@@ -76,7 +129,7 @@ def get_tickers():
     if not MT5_AVAILABLE:
         return jsonify({"success": False, "error": "MetaTrader5 Python module not installed."}), 500
 
-    if not mt5.terminal_info() and not mt5.initialize():
+    if not ensure_mt5_connected():
         return jsonify({"success": False, "error": "MT5 terminal not connected"}), 500
 
     symbols = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "US30", "US500", "BTCUSD"]
@@ -105,7 +158,12 @@ def place_trade():
     if not MT5_AVAILABLE:
         return jsonify({"success": False, "error": "MetaTrader5 Python module is not installed."}), 500
 
-    if not mt5.terminal_info() and not mt5.initialize():
+    data = request.json or {}
+    acc = data.get('account') or data.get('accountId')
+    pwd = data.get('password')
+    srv = data.get('server') or data.get('serverName')
+
+    if not ensure_mt5_connected(acc, pwd, srv):
         return jsonify({"success": False, "error": f"Failed to connect to XM MT5 terminal: {mt5.last_error()}"}), 500
 
     data = request.json or {}
