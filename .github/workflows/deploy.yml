@@ -59,18 +59,17 @@ jobs:
             pip install --upgrade pip setuptools wheel
             pip install -r requirements.txt
 
-            # 3. Build & Run Headless MT5 Docker Container on GCP Linux VM
-            echo "⚙️ Stage 3: Starting Headless MT5 Docker Container..."
-            docker rm -f mt5-bridge 2>/dev/null || true
-            docker build -t mt5-bridge .
-            docker run -d --name mt5-bridge -p 8555:8555 --restart always mt5-bridge
+            # 3. Run Bare-Metal MT5 Bridge Setup (No Docker)
+            echo "⚙️ Stage 3: Deploying MT5 Bridge directly via PM2 (No Docker)..."
+            chmod +x setup_baremetal_vm.sh
+            ./setup_baremetal_vm.sh
 
             # 4. Verify Service Health
-            echo "🔍 Stage 4: Verifying Headless MT5 Service Health..."
+            echo "🔍 Stage 4: Verifying MT5 Service Health..."
             sleep 3
             if curl -s http://localhost:8555/health | grep -q "online"; then
-              echo "✅ Success! Headless MT5 Docker Bridge is ONLINE and listening on http://localhost:8555"
+              echo "✅ Success! MT5 Bridge is ONLINE and listening on http://localhost:8555"
             else
-              echo "⚠️ Container started, check logs via 'docker logs mt5-bridge'"
+              echo "⚠️ Service started, check logs via 'pm2 logs mt5-bridge'"
             fi
             echo "========================================================"
