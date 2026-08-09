@@ -13,6 +13,8 @@ sudo apt install -y wine64 wine32 xvfb wget curl unzip ca-certificates
 
 # 2. Setup Windows Python 3.10 inside Wine
 echo "🐍 Setting up Windows Python 3.10 inside Wine..."
+export WINEDEBUG=-all
+xvfb-run winecfg -v win10 || true
 mkdir -p ~/.wine/drive_c/Python310
 if [ ! -f ~/.wine/drive_c/Python310/python.exe ]; then
   wget -q https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip -O python.zip
@@ -35,7 +37,7 @@ xvfb-run wine64 ~/.wine/drive_c/Python310/python.exe -m pip install --upgrade Me
 echo "⚙️ Starting MT5 Bridge via PM2..."
 if command -v pm2 &> /dev/null; then
   pm2 delete mt5-bridge 2>/dev/null || true
-  pm2 start "xvfb-run wine64 ~/.wine/drive_c/Python310/python.exe mt5_bridge.py" --name mt5-bridge
+  pm2 start "WINEDEBUG=-all xvfb-run wine64 ~/.wine/drive_c/Python310/python.exe mt5_bridge.py" --name mt5-bridge
   pm2 save
   echo "✅ Success! MT5 Bridge is running under PM2 on http://localhost:8555"
 else
