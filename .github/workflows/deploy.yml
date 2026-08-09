@@ -73,8 +73,8 @@ jobs:
             # 4. Verify Service Health
             echo "🔍 Stage 4: Verifying Service Health..."
             sleep 2
-            if curl -s http://localhost:8080/health | grep -q "online"; then
-              echo "✅ Success! MT5 Local Bridge is ONLINE and listening on http://localhost:8080"
+            if curl -s http://localhost:8555/health | grep -q "online"; then
+              echo "✅ Success! MT5 Local Bridge is ONLINE and listening on http://localhost:8555"
             else
               echo "⚠️ Warning: Service started, check logs at $TARGET_DIR/bridge.log or via 'pm2 logs mt5-bridge'"
             fi

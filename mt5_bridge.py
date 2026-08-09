@@ -173,9 +173,11 @@ def place_trade():
     })
 
 if __name__ == '__main__':
+    import os
+    port = int(os.environ.get('PORT', 8555))
     print("=" * 60)
     print("🚀 XM360 Local MT5 Execution Bridge")
-    print("Listen URL: http://0.0.0.0:8080")
+    print(f"Listen URL: http://0.0.0.0:{port}")
     print("=" * 60)
 
     if MT5_AVAILABLE:
@@ -190,4 +192,4 @@ if __name__ == '__main__':
     else:
         print("❌ MetaTrader5 module missing. Install via: pip install MetaTrader5")
 
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=port)
