@@ -59,10 +59,10 @@ jobs:
             pip install --upgrade pip setuptools wheel
             pip install -r requirements.txt
 
-            # 3. Run Bare-Metal MT5 Bridge Setup (No Docker)
-            echo "⚙️ Stage 3: Deploying MT5 Bridge directly via PM2 (No Docker)..."
-            chmod +x setup_baremetal_vm.sh
-            ./setup_baremetal_vm.sh
+            # 3. Run mt5linux Bridge Setup
+            echo "⚙️ Stage 3: Running mt5linux Bridge Setup..."
+            chmod +x setup.sh
+            ./setup.sh
 
             # 4. Verify Service Health
             echo "🔍 Stage 4: Verifying MT5 Service Health..."
