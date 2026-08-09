@@ -17,17 +17,28 @@ try:
 except ImportError:
     HAS_CORS = False
 
+import os
+
+MT5_HOST = os.environ.get('MT5_HOST', 'localhost')
+MT5_PORT = int(os.environ.get('MT5_PORT', 18812))
+
 try:
-    import MetaTrader5 as mt5
+    from mt5linux import MetaTrader5 as MT5LinuxClient
+    mt5 = MT5LinuxClient(host=MT5_HOST, port=MT5_PORT)
     MT5_AVAILABLE = True
+    IS_MT5_LINUX = True
 except ImportError:
-    MT5_AVAILABLE = False
+    try:
+        import MetaTrader5 as mt5
+        MT5_AVAILABLE = True
+        IS_MT5_LINUX = False
+    except ImportError:
+        MT5_AVAILABLE = False
+        IS_MT5_LINUX = False
 
 app = Flask(__name__)
 if HAS_CORS:
     CORS(app)
-
-import os
 
 MT5_TERMINAL_PATH = os.environ.get(
     'MT5_PATH',
