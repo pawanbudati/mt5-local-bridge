@@ -72,7 +72,10 @@ def health():
 @app.route('/connect', methods=['POST'])
 def connect_account():
     if not MT5_AVAILABLE:
-        return jsonify({"success": False, "error": "MetaTrader5 Python module not installed."}), 500
+        return jsonify({
+            "success": False,
+            "error": "MetaTrader5 Python library is not installed on this Linux OS. Please run mt5_bridge.py on your Windows PC/VPS where MetaTrader 5 terminal is installed."
+        }), 400
 
     data = request.json or {}
     acc = data.get('account') or data.get('accountId')
@@ -98,7 +101,10 @@ def connect_account():
 @app.route('/account', methods=['GET'])
 def get_account():
     if not MT5_AVAILABLE:
-        return jsonify({"success": False, "error": "MetaTrader5 Python module not installed."}), 500
+        return jsonify({
+            "success": False,
+            "error": "MetaTrader5 Python library is not installed on this Linux OS. Please run mt5_bridge.py on your Windows PC/VPS."
+        }), 400
 
     acc_id = request.args.get('account')
     pwd = request.args.get('password')
