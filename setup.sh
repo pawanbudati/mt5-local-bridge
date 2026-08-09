@@ -18,21 +18,25 @@ docker run -d \
 echo "⏳ Waiting 5 seconds for mt5linux server container..."
 sleep 5
 
-# 2. Install dependencies
-echo "🐍 Installing mt5linux Python dependencies..."
-python3 -m pip install --upgrade pip
-python3 -m pip install -r requirements.txt
+# 2. Setup Python virtual environment & install dependencies
+echo "🐍 Setting up Python virtual environment and dependencies..."
+if [ ! -d "venv" ]; then
+  python3 -m venv venv
+fi
+source venv/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
 
-# 3. Start mt5_bridge.py
+# 3. Start mt5_bridge.py using venv Python
 echo "⚙️ Starting MT5 Bridge service on port 8555..."
 if command -v pm2 &> /dev/null; then
   pm2 delete mt5-bridge 2>/dev/null || true
-  pm2 start mt5_bridge.py --name mt5-bridge
+  pm2 start "venv/bin/python mt5_bridge.py" --name mt5-bridge
   pm2 save
   echo "✅ Success! MT5 Bridge is running under PM2 on http://localhost:8555"
 else
   pkill -f "mt5_bridge.py" || true
-  nohup python3 mt5_bridge.py > bridge.log 2>&1 &
+  nohup venv/bin/python mt5_bridge.py > bridge.log 2>&1 &
   echo "✅ Success! MT5 Bridge is running in background on http://localhost:8555"
 fi
 
