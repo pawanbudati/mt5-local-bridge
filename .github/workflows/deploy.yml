@@ -61,8 +61,7 @@ jobs:
 
             # 3. Build & Run Headless MT5 Docker Container on GCP Linux VM
             echo "⚙️ Stage 3: Starting Headless MT5 Docker Container..."
-            docker stop mt5-bridge 2>/dev/null || true
-            docker rm mt5-bridge 2>/dev/null || true
+            docker rm -f mt5-bridge 2>/dev/null || true
             docker build -t mt5-bridge .
             docker run -d --name mt5-bridge -p 8555:8555 --restart always mt5-bridge
 
