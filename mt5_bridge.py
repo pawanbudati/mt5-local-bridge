@@ -27,18 +27,43 @@ app = Flask(__name__)
 if HAS_CORS:
     CORS(app)
 
+import os
+
+MT5_TERMINAL_PATH = os.environ.get(
+    'MT5_PATH',
+    r"C:\Program Files\MetaTrader 5\terminal64.exe"
+)
+
 def ensure_mt5_connected(account_id=None, password=None, server_name=None):
     if not MT5_AVAILABLE:
         return False
 
     # Check if already connected & logged in
-    if mt5.terminal_info() and mt5.account_info():
-        return True
-
-    # Try default terminal attach
-    if mt5.initialize():
-        if mt5.account_info():
+    try:
+        term = mt5.terminal_info()
+        acc = mt5.account_info()
+        if term and acc:
             return True
+    except Exception:
+        pass
+
+    # Try initializing MT5 terminal safely
+    init_success = False
+    try:
+        if os.path.exists(MT5_TERMINAL_PATH):
+            init_success = mt5.initialize(path=MT5_TERMINAL_PATH)
+        else:
+            init_success = mt5.initialize()
+    except Exception as e:
+        print(f"⚠️ Exception during mt5.initialize(): {e}")
+        return False
+
+    if not init_success:
+        try:
+            print(f"⚠️ mt5.initialize() failed: {mt5.last_error()}")
+        except Exception:
+            pass
+        return False
 
     # Try explicit credential login
     if account_id and password:
@@ -54,19 +79,27 @@ def ensure_mt5_connected(account_id=None, password=None, server_name=None):
         except Exception as e:
             print(f"⚠️ MT5 login error: {e}")
 
-    return mt5.terminal_info() is not None and mt5.account_info() is not None
+    try:
+        return mt5.terminal_info() is not None and mt5.account_info() is not None
+    except Exception:
+        return False
 
 @app.route('/health', methods=['GET'])
 def health():
     connected = ensure_mt5_connected()
-    acc_info = mt5.account_info() if connected else None
+    acc_info = None
+    if connected:
+        try:
+            acc_info = mt5.account_info()
+        except Exception:
+            pass
 
     return jsonify({
         "status": "online",
         "mt5_connected": connected,
-        "account_id": acc_info.login if acc_info else None,
-        "company": acc_info.company if acc_info else None,
-        "server": acc_info.server if acc_info else None,
+        "account_id": getattr(acc_info, 'login', None) if acc_info else None,
+        "company": getattr(acc_info, 'company', None) if acc_info else None,
+        "server": getattr(acc_info, 'server', None) if acc_info else None,
     })
 
 @app.route('/connect', methods=['POST'])
@@ -74,7 +107,7 @@ def connect_account():
     if not MT5_AVAILABLE:
         return jsonify({
             "success": False,
-            "error": "MetaTrader5 Python library is not installed on this Linux OS. Please run mt5_bridge.py on your Windows PC/VPS where MetaTrader 5 terminal is installed."
+            "error": "MetaTrader5 Python library is not installed."
         }), 400
 
     data = request.json or {}
@@ -86,8 +119,14 @@ def connect_account():
         return jsonify({"success": False, "error": "Account ID and Password required"}), 400
 
     connected = ensure_mt5_connected(acc, pwd, srv)
-    if connected and mt5.account_info():
-        info = mt5.account_info()
+    info = None
+    if connected:
+        try:
+            info = mt5.account_info()
+        except Exception:
+            pass
+
+    if connected and info:
         return jsonify({
             "success": True,
             "message": f"Connected to MT5 Account {info.login}",
@@ -95,8 +134,12 @@ def connect_account():
             "server": info.server
         })
     else:
-        err = str(mt5.last_error())
-        return jsonify({"success": False, "error": f"Failed to connect MT5 terminal: {err}"}), 400
+        err_msg = "Could not initialize MT5 terminal inside Wine environment."
+        try:
+            err_msg = str(mt5.last_error())
+        except Exception:
+            pass
+        return jsonify({"success": False, "error": f"Failed to connect MT5 terminal: {err_msg}"}), 400
 
 @app.route('/account', methods=['GET'])
 def get_account():
