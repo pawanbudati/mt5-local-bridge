@@ -1,0 +1,81 @@
+name: Deploy MT5 Local Bridge to VM
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    name: Deploy Python MT5 Bridge Service
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy & Start MT5 Bridge Service via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USERNAME }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          script: |
+            set -e
+            echo "========================================================"
+            echo "🚀 Stage 1: Deploying mt5-local-bridge to VM..."
+            echo "========================================================"
+
+            TARGET_DIR="$HOME/mt5-local-bridge"
+
+            # 1. Clone or Pull Latest Code
+            if [ ! -d "$TARGET_DIR" ]; then
+              echo "📥 Cloning repository for the first time..."
+              git clone https://github.com/pawanbudati/mt5-local-bridge.git "$TARGET_DIR" || \
+              git clone https://github.com/${{ github.repository }}.git "$TARGET_DIR"
+            else
+              echo "🔄 Pulling latest changes from remote..."
+              cd "$TARGET_DIR"
+              git fetch --all
+              git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+            fi
+
+            cd "$TARGET_DIR"
+
+            # 2. Setup Python Environment & Dependencies
+            echo "🐍 Stage 2: Preparing Python environment..."
+            if ! command -v python3 &> /dev/null; then
+              echo "⚠️ python3 missing, please install python3"
+            fi
+
+            if [ ! -d "venv" ]; then
+              echo "📦 Creating virtual environment 'venv'..."
+              python3 -m venv venv || python -m venv venv
+            fi
+
+            source venv/bin/activate
+            echo "⬆️ Upgrading pip and installing requirements..."
+            pip install --upgrade pip setuptools wheel
+            pip install -r requirements.txt
+
+            # 3. Start / Restart Bridge Service via PM2
+            echo "⚙️ Stage 3: Managing MT5 Bridge process via PM2..."
+            if command -v pm2 &> /dev/null; then
+              pm2 restart mt5-bridge || pm2 start mt5_bridge.py --name mt5-bridge --interpreter venv/bin/python
+              pm2 save
+            else
+              echo "⚠️ PM2 not found, running via background nohup..."
+              pkill -f "mt5_bridge.py" || true
+              nohup venv/bin/python mt5_bridge.py > bridge.log 2>&1 &
+            fi
+
+            # 4. Verify Service Health
+            echo "🔍 Stage 4: Verifying Service Health..."
+            sleep 2
+            if curl -s http://localhost:8080/health | grep -q "online"; then
+              echo "✅ Success! MT5 Local Bridge is ONLINE and listening on http://localhost:8080"
+            else
+              echo "⚠️ Warning: Service started, check logs at $TARGET_DIR/bridge.log or via 'pm2 logs mt5-bridge'"
+            fi
+            echo "========================================================"
