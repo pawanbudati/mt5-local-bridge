@@ -59,23 +59,19 @@ jobs:
             pip install --upgrade pip setuptools wheel
             pip install -r requirements.txt
 
-            # 3. Start / Restart Bridge Service via PM2
-            echo "⚙️ Stage 3: Managing MT5 Bridge process via PM2..."
-            if command -v pm2 &> /dev/null; then
-              pm2 restart mt5-bridge || pm2 start mt5_bridge.py --name mt5-bridge --interpreter venv/bin/python
-              pm2 save
-            else
-              echo "⚠️ PM2 not found, running via background nohup..."
-              pkill -f "mt5_bridge.py" || true
-              nohup venv/bin/python mt5_bridge.py > bridge.log 2>&1 &
-            fi
+            # 3. Build & Run Headless MT5 Docker Container on GCP Linux VM
+            echo "⚙️ Stage 3: Starting Headless MT5 Docker Container..."
+            docker stop mt5-bridge 2>/dev/null || true
+            docker rm mt5-bridge 2>/dev/null || true
+            docker build -t mt5-bridge .
+            docker run -d --name mt5-bridge -p 8555:8555 --restart always mt5-bridge
 
             # 4. Verify Service Health
-            echo "🔍 Stage 4: Verifying Service Health..."
-            sleep 2
+            echo "🔍 Stage 4: Verifying Headless MT5 Service Health..."
+            sleep 3
             if curl -s http://localhost:8555/health | grep -q "online"; then
-              echo "✅ Success! MT5 Local Bridge is ONLINE and listening on http://localhost:8555"
+              echo "✅ Success! Headless MT5 Docker Bridge is ONLINE and listening on http://localhost:8555"
             else
-              echo "⚠️ Warning: Service started, check logs at $TARGET_DIR/bridge.log or via 'pm2 logs mt5-bridge'"
+              echo "⚠️ Container started, check logs via 'docker logs mt5-bridge'"
             fi
             echo "========================================================"
